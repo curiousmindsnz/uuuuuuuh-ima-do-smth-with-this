@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCP-939 Escape - 3D</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        canvas {
+            display: block;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #0f0;
+            font-size: 16px;
+            text-shadow: 0 0 5px #0f0;
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(0, 255, 0, 0.5);
+        }
+        
+        #crosshair::before {
+            left: 50%;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            transform: translateX(-50%);
+        }
+        
+        #crosshair::after {
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            transform: translateY(-50%);
+        }
+        
+        #instructions {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: #0f0;
+            padding: 30px;
+            border: 2px solid #0f0;
+            text-align: center;
+            max-width: 600px;
+            z-index: 10;
+        }
+        
+        #instructions h1 {
+            color: #f00;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+        
+        #instructions p {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        
+        #instructions button {
+            margin-top: 20px;
+            padding: 10px 30px;
+            background: #0f0;
+            border: none;
+            color: #000;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+        
+        #instructions button:hover {
+            background: #0c0;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: #f00;
+            padding: 40px;
+            border: 3px solid #f00;
+            text-align: center;
+            z-index: 10;
+            font-size: 24px;
+        }
+        
+        #gameOver button {
+            margin-top: 20px;
+            padding: 10px 30px;
+            background: #f00;
+            border: none;
+            color: #000;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+        
+        #victory {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: #0f0;
+            padding: 40px;
+            border: 3px solid #0f0;
+            text-align: center;
+            z-index: 10;
+            font-size: 24px;
+        }
+        
+        #victory button {
+            margin-top: 20px;
+            padding: 10px 30px;
+            background: #0f0;
+            border: none;
+            color: #000;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="crosshair"></div>
+        
+        <div id="ui">
+            <div>NOISE LEVEL: <span id="noiseLevel">0%</span></div>
+            <div>FLASHLIGHT: <span id="flashlight">ON</span> (F key)</div>
+            <div>AMMO: <span id="ammo">12</span> / <span id="totalAmmo">24</span> (R to reload)</div>
+            <div>SPRINT: <span id="sprint">SHIFT</span></div>
+            <div style="margin-top: 10px; color: #ff0;">⚠ SCP-939 hunts by sound!</div>
+            <div style="color: #ff0;">💡 Shoot lights to distract SCP-939!</div>
+        </div>
+        
+        <div id="instructions">
+            <h1>⚠ SCP-939 CONTAINMENT BREACH ⚠</h1>
+            <p><strong>OBJECTIVE:</strong> Escape the maintenance tunnels</p>
+            <p><strong>THREAT:</strong> SCP-939 is blind but hunts by sound</p>
+            <p><strong>CONTROLS:</strong></p>
+            <p>WASD - Move (makes noise)<br>
+            Mouse - Look around<br>
+            SHIFT - Sprint (LOUD noise)<br>
+            F - Toggle Flashlight (light repels SCP-939)<br>
+            Left Click - Shoot handgun<br>
+            R - Reload</p>
+            <p><strong>SURVIVAL TIPS:</strong></p>
+            <p>• Move slowly to reduce noise<br>
+            • Use your flashlight to keep SCP-939 away<br>
+            • Sprinting is loud but faster<br>
+            • Shoot lights to create distractions (VERY LOUD)<br>
+            • Breaking lights attracts SCP-939 to that location<br>
+            • Find the EXIT (green glowing door)<br>
+            • Stay in first-person view for immersion</p>
+            <button onclick="startGame()">START MISSION</button>
+        </div>
+        
+        <div id="gameOver" class="hidden">
+            <h2>YOU WERE CONSUMED</h2>
+            <p>SCP-939 heard you...</p>
+            <button onclick="restartGame()">TRY AGAIN</button>
+        </div>
+        
+        <div id="victory" class="hidden">
+            <h2>CONTAINMENT SUCCESSFUL</h2>
+            <p>You escaped the maintenance tunnels!</p>
+            <button onclick="restartGame()">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Three.js setup
+        let scene, camera, renderer;
+        let player, scp939Mesh, flashlight;
+        let walls = [];
+        let exitDoor;
+        let lights = [];
+        let muzzleFlash;
+        
+        // Game state
+        let gameStarted = false;
+        let gameOver = false;
+        let victory = false;
+        let pointerLocked = false;
+        
+        // Player state
+        const playerState = {
+            position: new THREE.Vector3(5, 1, 5),
+            velocity: new THREE.Vector3(),
+            speed: 0.1,
+            sprintSpeed: 0.2,
+            noiseLevel: 0,
+            flashlightOn: true,
+            height: 1.8,
+            radius: 0.5,
+            ammo: 12,
+            totalAmmo: 24,
+            reloading: false
+        };
+        
+        // SCP-939 state
+        const scpState = {
+            position: new THREE.Vector3(0, 0.5, 0), // Will be randomized
+            velocity: new THREE.Vector3(),
+            speed: 0.08,
+            targetPosition: new THREE.Vector3(0, 0.5, 0),
+            hearingRange: 15,
+            lightRepelDistance: 8,
+            patrolTimer: 0,
+            investigating: false
+        };
+        
+        // Function to get random spawn position for SCP-939
+        function getRandomSCPSpawn() {
+            let validPosition = false;
+            let x, z;
+            
+            while (!validPosition) {
+                // Random position in the maze
+                x = (Math.random() - 0.5) * 40;
+                z = (Math.random() - 0.5) * 40;
+                
+                // Check distance from player (must be at least 15 units away)
+                const distFromPlayer = Math.sqrt(
+                    Math.pow(x - playerState.position.x, 2) + 
+                    Math.pow(z - playerState.position.z, 2)
+                );
+                
+                // Check distance from exit (don't spawn too close to exit)
+                const distFromExit = Math.sqrt(
+                    Math.pow(x - 23, 2) + 
+                    Math.pow(z - (-24), 2)
+                );
+                
+                if (distFromPlayer > 15 && distFromExit > 10) {
+                    // Check if position is not inside a wall
+                    const testPos = new THREE.Vector3(x, 0.5, z);
+                    if (!checkSCPWallCollision(testPos)) {
+                        validPosition = true;
+                    }
+                }
+            }
+            
+            return new THREE.Vector3(x, 0.5, z);
+        }
+        
+        // Input
+        const keys = {};
+        const mouse = { x: 0, y: 0 };
+        
+        function initThreeJS() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+            scene.fog = new THREE.Fog(0x000000, 0, 30);
+            
+            // Camera (first person)
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.copy(playerState.position);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('gameContainer').appendChild(renderer.domElement);
+            
+            // Ambient light (very dim)
+            const ambientLight = new THREE.AmbientLight(0x111111);
+            scene.add(ambientLight);
+            
+            // Flashlight (spotlight)
+            flashlight = new THREE.SpotLight(0xffffaa, 1.5, 20, Math.PI / 6, 0.5, 2);
+            flashlight.position.copy(camera.position);
+            flashlight.target.position.set(0, 0, -1);
+            flashlight.castShadow = true;
+            flashlight.shadow.mapSize.width = 1024;
+            flashlight.shadow.mapSize.height = 1024;
+            scene.add(flashlight);
+            scene.add(flashlight.target);
+            
+            createMaze();
+            createLights();
+            createSCP939();
+            createExit();
+            createMuzzleFlash();
+            
+            // Event listeners
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('click', (e) => {
+                if (gameStarted && pointerLocked) {
+                    shoot();
+                } else if (gameStarted && !pointerLocked) {
+                    renderer.domElement.requestPointerLock();
+                }
+            });
+            
+            document.addEventListener('pointerlockchange', () => {
+                pointerLocked = document.pointerLockElement === renderer.domElement;
+            });
+        }
+        
+        function createMaze() {
+            const wallHeight = 4;
+            const wallThickness = 0.5;
+            
+            const wallMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x333333,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            
+            // Floor
+            const floorGeometry = new THREE.PlaneGeometry(50, 50);
+            const floorMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x222222,
+                roughness: 1
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+            
+            // Ceiling
+            const ceiling = new THREE.Mesh(floorGeometry, floorMaterial);
+            ceiling.rotation.x = Math.PI / 2;
+            ceiling.position.y = wallHeight;
+            scene.add(ceiling);
+            
+            // Maze walls (3D version of the 2D maze)
+            const wallConfigs = [
+                // Outer walls
+                { x: 0, z: 0, width: 50, depth: wallThickness },
+                { x: 0, z: 0, width: wallThickness, depth: 50 },
+                { x: 50 - wallThickness, z: 0, width: wallThickness, depth: 50 },
+                { x: 0, z: 50 - wallThickness, width: 50, depth: wallThickness },
+                
+                // Internal maze walls
+                { x: 8, z: 8, width: wallThickness, depth: 12 },
+                { x: 12, z: 12, width: wallThickness, depth: 15 },
+                { x: 18, z: 8, width: wallThickness, depth: 12 },
+                { x: 24, z: 12, width: wallThickness, depth: 18 },
+                { x: 30, z: 4, width: wallThickness, depth: 15 },
+                { x: 36, z: 12, width: wallThickness, depth: 18 },
+                
+                { x: 8, z: 8, width: 12, depth: wallThickness },
+                { x: 18, z: 12, width: 12, depth: wallThickness },
+                { x: 8, z: 18, width: 8, depth: wallThickness },
+                { x: 18, z: 24, width: 12, depth: wallThickness },
+                { x: 30, z: 18, width: 12, depth: wallThickness },
+                { x: 24, z: 30, width: 12, depth: wallThickness },
+            ];
+            
+            wallConfigs.forEach(config => {
+                const geometry = new THREE.BoxGeometry(config.width, wallHeight, config.depth);
+                const wall = new THREE.Mesh(geometry, wallMaterial);
+                wall.position.set(
+                    config.x + config.width / 2 - 25,
+                    wallHeight / 2,
+                    config.z + config.depth / 2 - 25
+                );
+                wall.castShadow = true;
+                wall.receiveShadow = true;
+                scene.add(wall);
+                walls.push({
+                    mesh: wall,
+                    box: new THREE.Box3().setFromObject(wall)
+                });
+            });
+        }
+        
+        function createSCP939() {
+            // Randomize spawn position
+            const spawnPos = getRandomSCPSpawn();
+            scpState.position.copy(spawnPos);
+            scpState.targetPosition.copy(spawnPos);
+            
+            // SCP-939 body (creature-like shape)
+            const bodyGeometry = new THREE.SphereGeometry(0.8, 16, 16);
+            bodyGeometry.scale(1, 0.7, 1.3);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x440000,
+                roughness: 0.9,
+                emissive: 0x220000
+            });
+            scp939Mesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            scp939Mesh.position.copy(scpState.position);
+            scp939Mesh.castShadow = true;
+            
+            // Add eyes (white glowing)
+            const eyeGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+            const eyeMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xffffff,
+                emissive: 0xffffff,
+                emissiveIntensity: 0.5
+            });
+            
+            const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            leftEye.position.set(-0.3, 0.2, 0.6);
+            scp939Mesh.add(leftEye);
+            
+            const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            rightEye.position.set(0.3, 0.2, 0.6);
+            scp939Mesh.add(rightEye);
+            
+            scene.add(scp939Mesh);
+        }
+        
+        function createExit() {
+            // Exit door
+            const doorGeometry = new THREE.BoxGeometry(2, 3, 0.2);
+            const doorMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x00ff00,
+                emissive: 0x00ff00,
+                emissiveIntensity: 0.5
+            });
+            exitDoor = new THREE.Mesh(doorGeometry, doorMaterial);
+            exitDoor.position.set(23, 1.5, -24);
+            scene.add(exitDoor);
+            
+            // Add point light at exit
+            const exitLight = new THREE.PointLight(0x00ff00, 1, 10);
+            exitLight.position.copy(exitDoor.position);
+            scene.add(exitLight);
+        }
+        
+        function createLights() {
+            // Create flickering ceiling lights throughout the maze
+            const lightPositions = [
+                { x: -15, z: -15 },
+                { x: -5, z: -15 },
+                { x: 5, z: -15 },
+                { x: 15, z: -15 },
+                { x: -15, z: -5 },
+                { x: -5, z: -5 },
+                { x: 5, z: -5 },
+                { x: 15, z: -5 },
+                { x: -15, z: 5 },
+                { x: -5, z: 5 },
+                { x: 5, z: 5 },
+                { x: 15, z: 5 },
+                { x: -15, z: 15 },
+                { x: -5, z: 15 },
+                { x: 5, z: 15 },
+                { x: 15, z: 15 }
+            ];
+            
+            lightPositions.forEach((pos, index) => {
+                // Light bulb mesh
+                const bulbGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+                const bulbMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xffffaa,
+                    emissive: 0xffffaa,
+                    emissiveIntensity: 1
+                });
+                const bulb = new THREE.Mesh(bulbGeometry, bulbMaterial);
+                bulb.position.set(pos.x, 3.5, pos.z);
+                scene.add(bulb);
+                
+                // Point light
+                const pointLight = new THREE.PointLight(0xffffaa, 0.8, 12);
+                pointLight.position.copy(bulb.position);
+                pointLight.castShadow = true;
+                scene.add(pointLight);
+                
+                lights.push({
+                    bulb: bulb,
+                    light: pointLight,
+                    broken: false,
+                    flickerTimer: Math.random() * 100,
+                    flickerSpeed: 0.5 + Math.random() * 0.5,
+                    baseIntensity: 0.8,
+                    position: new THREE.Vector3(pos.x, 3.5, pos.z)
+                });
+            });
+        }
+        
+        function createMuzzleFlash() {
+            const flashGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+            const flashMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffaa00,
+                transparent: true,
+                opacity: 0
+            });
+            muzzleFlash = new THREE.Mesh(flashGeometry, flashMaterial);
+            scene.add(muzzleFlash);
+        }
+        
+        function shoot() {
+            if (playerState.ammo <= 0 || playerState.reloading) {
+                // Click sound for empty gun
+                return;
+            }
+            
+            playerState.ammo--;
+            playerState.noiseLevel = 100; // Shooting is VERY loud
+            
+            // Muzzle flash effect
+            const lookDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+            muzzleFlash.position.copy(camera.position).add(lookDirection.multiplyScalar(0.5));
+            muzzleFlash.material.opacity = 1;
+            
+            setTimeout(() => {
+                muzzleFlash.material.opacity = 0;
+            }, 50);
+            
+            // Raycast to detect hits
+            const raycaster = new THREE.Raycaster();
+            const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+            raycaster.set(camera.position, direction);
+            
+            // Check if any lights are hit
+            for (let lightObj of lights) {
+                if (lightObj.broken) continue;
+                
+                const distance = raycaster.ray.distanceToPoint(lightObj.position);
+                if (distance < 0.5) {
+                    // Hit a light!
+                    breakLight(lightObj);
+                    break;
+                }
+            }
+        }
+        
+        function breakLight(lightObj) {
+            lightObj.broken = true;
+            lightObj.light.intensity = 0;
+            lightObj.bulb.material.emissive.setHex(0x000000);
+            lightObj.bulb.material.emissiveIntensity = 0;
+            lightObj.bulb.material.color.setHex(0x222222);
+            
+            // Create glass shattering effect
+            for (let i = 0; i < 8; i++) {
+                const shardGeometry = new THREE.BoxGeometry(0.05, 0.05, 0.05);
+                const shardMaterial = new THREE.MeshBasicMaterial({ color: 0xaaaaaa });
+                const shard = new THREE.Mesh(shardGeometry, shardMaterial);
+                shard.position.copy(lightObj.position);
+                shard.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.2,
+                    (Math.random() - 0.5) * 0.2,
+                    (Math.random() - 0.5) * 0.2
+                );
+                scene.add(shard);
+                
+                // Animate shard falling
+                const animateShard = () => {
+                    shard.position.add(shard.velocity);
+                    shard.velocity.y -= 0.01; // Gravity
+                    shard.rotation.x += 0.1;
+                    shard.rotation.y += 0.1;
+                    
+                    if (shard.position.y > 0) {
+                        requestAnimationFrame(animateShard);
+                    } else {
+                        scene.remove(shard);
+                    }
+                };
+                animateShard();
+            }
+            
+            // Attract SCP-939 to the broken light location
+            scpState.targetPosition.copy(lightObj.position);
+            scpState.targetPosition.y = 0.5;
+            scpState.investigating = true;
+        }
+        
+        function reload() {
+            if (playerState.totalAmmo <= 0 || playerState.ammo === 12) return;
+            
+            playerState.reloading = true;
+            playerState.noiseLevel = 60; // Reloading makes noise
+            
+            setTimeout(() => {
+                const ammoNeeded = 12 - playerState.ammo;
+                const ammoToReload = Math.min(ammoNeeded, playerState.totalAmmo);
+                playerState.ammo += ammoToReload;
+                playerState.totalAmmo -= ammoToReload;
+                playerState.reloading = false;
+            }, 1500);
+        }
+        
+        function updateLights() {
+            lights.forEach(lightObj => {
+                if (lightObj.broken) return;
+                
+                // Flickering effect
+                lightObj.flickerTimer += lightObj.flickerSpeed;
+                const flicker = Math.sin(lightObj.flickerTimer) * 0.1 + Math.random() * 0.05;
+                lightObj.light.intensity = lightObj.baseIntensity + flicker;
+                lightObj.bulb.material.emissiveIntensity = 1 + flicker;
+            });
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        function onKeyDown(e) {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key.toLowerCase() === 'f' && gameStarted) {
+                playerState.flashlightOn = !playerState.flashlightOn;
+                flashlight.visible = playerState.flashlightOn;
+            }
+            if (e.key.toLowerCase() === 'r' && gameStarted && !playerState.reloading) {
+                reload();
+            }
+        }
+        
+        function onKeyUp(e) {
+            keys[e.key.toLowerCase()] = false;
+        }
+        
+        function onMouseMove(e) {
+            if (!pointerLocked || !gameStarted) return;
+            
+            const movementX = e.movementX || 0;
+            const movementY = e.movementY || 0;
+            
+            camera.rotation.y -= movementX * 0.002;
+            camera.rotation.x -= movementY * 0.002;
+            
+            // Limit vertical rotation
+            camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+        }
+        
+        function startGame() {
+            document.getElementById('instructions').classList.add('hidden');
+            gameStarted = true;
+            renderer.domElement.requestPointerLock();
+            animate();
+        }
+        
+        function restartGame() {
+            playerState.position.set(5, 1, 5);
+            playerState.velocity.set(0, 0, 0);
+            playerState.noiseLevel = 0;
+            playerState.flashlightOn = true;
+            playerState.ammo = 12;
+            playerState.totalAmmo = 24;
+            playerState.reloading = false;
+            
+            // Randomize SCP-939 spawn on restart
+            const newSpawn = getRandomSCPSpawn();
+            scpState.position.copy(newSpawn);
+            scpState.targetPosition.copy(newSpawn);
+            scpState.investigating = false;
+            
+            camera.position.copy(playerState.position);
+            camera.rotation.set(0, 0, 0);
+            
+            flashlight.visible = true;
+            
+            gameOver = false;
+            victory = false;
+            document.getElementById('gameOver').classList.add('hidden');
+            document.getElementById('victory').classList.add('hidden');
+            
+            gameStarted = true;
+            renderer.domElement.requestPointerLock();
+            animate();
+        }
+        
+        function updatePlayer(delta) {
+            let moving = false;
+            let sprinting = keys['shift'];
+            let speed = sprinting ? playerState.sprintSpeed : playerState.speed;
+            
+            const direction = new THREE.Vector3();
+            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+            
+            forward.y = 0;
+            forward.normalize();
+            right.y = 0;
+            right.normalize();
+            
+            if (keys['w']) {
+                direction.add(forward);
+                moving = true;
+            }
+            if (keys['s']) {
+                direction.sub(forward);
+                moving = true;
+            }
+            if (keys['a']) {
+                direction.sub(right);
+                moving = true;
+            }
+            if (keys['d']) {
+                direction.add(right);
+                moving = true;
+            }
+            
+            direction.normalize();
+            
+            if (moving) {
+                playerState.noiseLevel = sprinting ? 100 : 40;
+                
+                const newPosition = playerState.position.clone();
+                newPosition.add(direction.multiplyScalar(speed));
+                
+                // Check wall collision
+                if (!checkWallCollision(newPosition)) {
+                    playerState.position.copy(newPosition);
+                }
+            } else {
+                playerState.noiseLevel = Math.max(0, playerState.noiseLevel - 2);
+            }
+            
+            // Update camera position
+            camera.position.copy(playerState.position);
+            
+            // Update flashlight
+            flashlight.position.copy(camera.position);
+            const lookDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+            flashlight.target.position.copy(camera.position).add(lookDirection);
+            
+            // Check exit collision
+            const distToExit = playerState.position.distanceTo(exitDoor.position);
+            if (distToExit < 2) {
+                victory = true;
+                gameStarted = false;
+                document.exitPointerLock();
+                document.getElementById('victory').classList.remove('hidden');
+            }
+            
+            // Check SCP-939 collision
+            const distToSCP = playerState.position.distanceTo(scpState.position);
+            if (distToSCP < 1.5) {
+                gameOver = true;
+                gameStarted = false;
+                document.exitPointerLock();
+                document.getElementById('gameOver').classList.remove('hidden');
+            }
+        }
+        
+        function checkWallCollision(position) {
+            const playerBox = new THREE.Box3(
+                new THREE.Vector3(
+                    position.x - playerState.radius,
+                    position.y - playerState.height / 2,
+                    position.z - playerState.radius
+                ),
+                new THREE.Vector3(
+                    position.x + playerState.radius,
+                    position.y + playerState.height / 2,
+                    position.z + playerState.radius
+                )
+            );
+            
+            for (let wall of walls) {
+                if (playerBox.intersectsBox(wall.box)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        function updateSCP939(delta) {
+            const distToPlayer = scpState.position.distanceTo(playerState.position);
+            
+            // Check if flashlight is pointed at SCP-939
+            let repelledByLight = false;
+            if (playerState.flashlightOn) {
+                const directionToSCP = new THREE.Vector3()
+                    .subVectors(scpState.position, playerState.position)
+                    .normalize();
+                const cameraDirection = new THREE.Vector3(0, 0, -1)
+                    .applyQuaternion(camera.quaternion)
+                    .normalize();
+                
+                const angle = directionToSCP.dot(cameraDirection);
+                
+                if (angle > 0.7 && distToPlayer < 10) {
+                    // Flashlight is pointing at SCP-939, repel it
+                    const repelDirection = new THREE.Vector3()
+                        .subVectors(scpState.position, playerState.position)
+                        .normalize();
+                    scpState.targetPosition.copy(scpState.position)
+                        .add(repelDirection.multiplyScalar(5));
+                    repelledByLight = true;
+                    
+                    // Make SCP-939 glow red when in light
+                    scp939Mesh.material.emissive.setHex(0xff0000);
+                    scp939Mesh.material.emissiveIntensity = 0.8;
+                }
+            }
+            
+            if (!repelledByLight) {
+                scp939Mesh.material.emissive.setHex(0x220000);
+                scp939Mesh.material.emissiveIntensity = 0.2;
+                
+                // Hunt by sound
+                if (playerState.noiseLevel > 0 && distToPlayer < scpState.hearingRange) {
+                    scpState.targetPosition.copy(playerState.position);
+                    scpState.investigating = true;
+                } else if (!scpState.investigating) {
+                    // Random patrol
+                    scpState.patrolTimer++;
+                    if (scpState.patrolTimer > 180) {
+                        scpState.targetPosition.set(
+                            (Math.random() - 0.5) * 40,
+                            0.5,
+                            (Math.random() - 0.5) * 40
+                        );
+                        scpState.patrolTimer = 0;
+                    }
+                }
+            }
+            
+            // Move towards target
+            const distToTarget = scpState.position.distanceTo(scpState.targetPosition);
+            if (distToTarget > 1) {
+                const direction = new THREE.Vector3()
+                    .subVectors(scpState.targetPosition, scpState.position)
+                    .normalize();
+                
+                const newPosition = scpState.position.clone()
+                    .add(direction.multiplyScalar(scpState.speed));
+                
+                // Simple wall avoidance
+                if (!checkSCPWallCollision(newPosition)) {
+                    scpState.position.copy(newPosition);
+                } else {
+                    // Choose new random target if hit wall
+                    scpState.targetPosition.set(
+                        (Math.random() - 0.5) * 40,
+                        0.5,
+                        (Math.random() - 0.5) * 40
+                    );
+                }
+            } else {
+                scpState.investigating = false;
+            }
+            
+            // Update mesh position and rotation
+            scp939Mesh.position.copy(scpState.position);
+            
+            // Make SCP-939 look at target
+            scp939Mesh.lookAt(scpState.targetPosition);
+        }
+        
+        function checkSCPWallCollision(position) {
+            const scpBox = new THREE.Box3(
+                new THREE.Vector3(position.x - 0.8, position.y - 0.5, position.z - 0.8),
+                new THREE.Vector3(position.x + 0.8, position.y + 1, position.z + 0.8)
+            );
+            
+            for (let wall of walls) {
+                if (scpBox.intersectsBox(wall.box)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        function updateUI() {
+            document.getElementById('noiseLevel').textContent = Math.round(playerState.noiseLevel) + '%';
+            document.getElementById('flashlight').textContent = playerState.flashlightOn ? 'ON' : 'OFF';
+            document.getElementById('flashlight').style.color = playerState.flashlightOn ? '#0f0' : '#f00';
+            document.getElementById('ammo').textContent = playerState.ammo;
+            document.getElementById('totalAmmo').textContent = playerState.totalAmmo;
+            
+            if (playerState.reloading) {
+                document.getElementById('ammo').textContent = 'RELOADING...';
+            }
+        }
+        
+        let lastTime = 0;
+        function animate(time = 0) {
+            if (!gameStarted) return;
+            
+            const delta = (time - lastTime) / 1000;
+            lastTime = time;
+            
+            updatePlayer(delta);
+            updateSCP939(delta);
+            updateLights();
+            updateUI();
+            
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        
+        // Initialize when page loads
+        initThreeJS();
+    </script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Game state
+        let gameStarted = false;
+        let gameOver = false;
+        let victory = false;
+        
+        // Player
+        const player = {
+            x: 50,
+            y: 50,
+            size: 15,
+            speed: 2,
+            sprintSpeed: 4,
+            flashlightOn: true,
+            flashlightRadius: 150,
+            noiseLevel: 0
+        };
+        
+        // SCP-939
+        const scp939 = {
+            x: 700,
+            y: 500,
+            size: 20,
+            speed: 1.5,
+            targetX: 700,
+            targetY: 500,
+            hearingRange: 300,
+            lightRepelDistance: 120,
+            patrolTimer: 0,
+            investigating: false
+        };
+        
+        // Maze walls
+        const walls = [
+            // Outer walls
+            {x: 0, y: 0, width: 800, height: 20},
+            {x: 0, y: 0, width: 20, height: 600},
+            {x: 780, y: 0, width: 20, height: 600},
+            {x: 0, y: 580, width: 800, height: 20},
+            
+            // Internal maze
+            {x: 100, y: 100, width: 20, height: 200},
+            {x: 200, y: 200, width: 20, height: 300},
+            {x: 300, y: 100, width: 20, height: 200},
+            {x: 400, y: 200, width: 20, height: 300},
+            {x: 500, y: 50, width: 20, height: 250},
+            {x: 600, y: 200, width: 20, height: 300},
+            
+            {x: 100, y: 100, width: 200, height: 20},
+            {x: 300, y: 200, width: 200, height: 20},
+            {x: 100, y: 300, width: 120, height: 20},
+            {x: 300, y: 400, width: 200, height: 20},
+            {x: 500, y: 300, width: 200, height: 20},
+            {x: 400, y: 500, width: 200, height: 20},
+        ];
+        
+        // Exit
+        const exit = {
+            x: 750,
+            y: 50,
+            width: 30,
+            height: 50
+        };
+        
+        // Input
+        const keys = {};
+        
+        // Event listeners
+        document.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key.toLowerCase() === 'f' && gameStarted) {
+                player.flashlightOn = !player.flashlightOn;
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+        
+        function startGame() {
+            document.getElementById('instructions').classList.add('hidden');
+            gameStarted = true;
+            gameLoop();
+        }
+        
+        function restartGame() {
+            player.x = 50;
+            player.y = 50;
+            player.noiseLevel = 0;
+            player.flashlightOn = true;
+            scp939.x = 700;
+            scp939.y = 500;
+            scp939.targetX = 700;
+            scp939.targetY = 500;
+            scp939.investigating = false;
+            gameOver = false;
+            victory = false;
+            document.getElementById('gameOver').classList.add('hidden');
+            document.getElementById('victory').classList.add('hidden');
+            gameStarted = true;
+            gameLoop();
+        }
+        
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.size > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.size > rect2.y;
+        }
+        
+        function checkWallCollision(newX, newY) {
+            for (let wall of walls) {
+                if (newX < wall.x + wall.width &&
+                    newX + player.size > wall.x &&
+                    newY < wall.y + wall.height &&
+                    newY + player.size > wall.y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        function updatePlayer() {
+            let moving = false;
+            let sprinting = keys['shift'];
+            let speed = sprinting ? player.sprintSpeed : player.speed;
+            
+            let newX = player.x;
+            let newY = player.y;
+            
+            if (keys['w'] || keys['arrowup']) {
+                newY -= speed;
+                moving = true;
+            }
+            if (keys['s'] || keys['arrowdown']) {
+                newY += speed;
+                moving = true;
+            }
+            if (keys['a'] || keys['arrowleft']) {
+                newX -= speed;
+                moving = true;
+            }
+            if (keys['d'] || keys['arrowright']) {
+                newX += speed;
+                moving = true;
+            }
+            
+            // Update noise level
+            if (moving) {
+                player.noiseLevel = sprinting ? 100 : 40;
+            } else {
+                player.noiseLevel = Math.max(0, player.noiseLevel - 2);
+            }
+            
+            // Check wall collision
+            if (!checkWallCollision(newX, newY)) {
+                player.x = newX;
+                player.y = newY;
+            }
+            
+            // Check exit collision
+            if (checkCollision(player, exit)) {
+                victory = true;
+                gameStarted = false;
+                document.getElementById('victory').classList.remove('hidden');
+            }
+            
+            // Check SCP-939 collision
+            const distToSCP = Math.hypot(player.x - scp939.x, player.y - scp939.y);
+            if (distToSCP < player.size + scp939.size) {
+                gameOver = true;
+                gameStarted = false;
+                document.getElementById('gameOver').classList.remove('hidden');
+            }
+        }
+        
+        function updateSCP939() {
+            const distToPlayer = Math.hypot(player.x - scp939.x, player.y - scp939.y);
+            
+            // Check if player's flashlight is pointed at SCP-939
+            let repelledByLight = false;
+            if (player.flashlightOn && distToPlayer < player.flashlightRadius) {
+                const angle = Math.atan2(scp939.y - player.y, scp939.x - player.x);
+                const lightIntensity = 1 - (distToPlayer / player.flashlightRadius);
+                if (distToPlayer < player.lightRepelDistance) {
+                    // Flee from light
+                    scp939.targetX = scp939.x + Math.cos(angle) * 100;
+                    scp939.targetY = scp939.y + Math.sin(angle) * 100;
+                    repelledByLight = true;
+                }
+            }
+            
+            // Hunt by sound if not repelled by light
+            if (!repelledByLight) {
+                if (player.noiseLevel > 0 && distToPlayer < scp939.hearingRange) {
+                    // Hear the player - move towards last known position
+                    scp939.targetX = player.x;
+                    scp939.targetY = player.y;
+                    scp939.investigating = true;
+                } else if (!scp939.investigating) {
+                    // Random patrol
+                    scp939.patrolTimer++;
+                    if (scp939.patrolTimer > 120) {
+                        scp939.targetX = Math.random() * (canvas.width - 100) + 50;
+                        scp939.targetY = Math.random() * (canvas.height - 100) + 50;
+                        scp939.patrolTimer = 0;
+                    }
+                }
+            }
+            
+            // Move towards target
+            const distToTarget = Math.hypot(scp939.targetX - scp939.x, scp939.targetY - scp939.y);
+            if (distToTarget > 5) {
+                const angle = Math.atan2(scp939.targetY - scp939.y, scp939.targetX - scp939.x);
+                const newX = scp939.x + Math.cos(angle) * scp939.speed;
+                const newY = scp939.y + Math.sin(angle) * scp939.speed;
+                
+                // Simple wall avoidance
+                let wallHit = false;
+                for (let wall of walls) {
+                    if (newX < wall.x + wall.width &&
+                        newX + scp939.size > wall.x &&
+                        newY < wall.y + wall.height &&
+                        newY + scp939.size > wall.y) {
+                        wallHit = true;
+                        break;
+                    }
+                }
+                
+                if (!wallHit) {
+                    scp939.x = newX;
+                    scp939.y = newY;
+                } else {
+                    // Try to navigate around wall
+                    scp939.targetX = Math.random() * canvas.width;
+                    scp939.targetY = Math.random() * canvas.height;
+                }
+            } else {
+                scp939.investigating = false;
+            }
+        }
+        
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw walls
+            ctx.fillStyle = '#333';
+            for (let wall of walls) {
+                ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+            }
+            
+            // Draw exit
+            ctx.fillStyle = '#0f0';
+            ctx.fillRect(exit.x, exit.y, exit.width, exit.height);
+            ctx.fillStyle = '#0f0';
+            ctx.font = '12px Courier New';
+            ctx.fillText('EXIT', exit.x + 2, exit.y - 5);
+            
+            // Draw flashlight cone
+            if (player.flashlightOn) {
+                const gradient = ctx.createRadialGradient(
+                    player.x + player.size/2, player.y + player.size/2, 10,
+                    player.x + player.size/2, player.y + player.size/2, player.flashlightRadius
+                );
+                gradient.addColorStop(0, 'rgba(255, 255, 200, 0.3)');
+                gradient.addColorStop(0.5, 'rgba(255, 255, 200, 0.1)');
+                gradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            
+            // Draw SCP-939
+            const distToPlayer = Math.hypot(player.x - scp939.x, player.y - scp939.y);
+            const inLight = player.flashlightOn && distToPlayer < player.flashlightRadius;
+            
+            ctx.fillStyle = inLight ? '#a00' : '#300';
+            ctx.beginPath();
+            ctx.arc(scp939.x + scp939.size/2, scp939.y + scp939.size/2, scp939.size, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw SCP-939 details (teeth/menacing look)
+            if (inLight) {
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(scp939.x + scp939.size/2 - 5, scp939.y + scp939.size/2, 3, 0, Math.PI * 2);
+                ctx.arc(scp939.x + scp939.size/2 + 5, scp939.y + scp939.size/2, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Draw player
+            ctx.fillStyle = '#00f';
+            ctx.fillRect(player.x, player.y, player.size, player.size);
+            
+            // Draw flashlight indicator on player
+            if (player.flashlightOn) {
+                ctx.fillStyle = '#ff0';
+                ctx.beginPath();
+                ctx.arc(player.x + player.size/2, player.y + player.size/2, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Update UI
+            document.getElementById('noiseLevel').textContent = Math.round(player.noiseLevel) + '%';
+            document.getElementById('flashlight').textContent = player.flashlightOn ? 'ON' : 'OFF';
+            document.getElementById('flashlight').style.color = player.flashlightOn ? '#0f0' : '#f00';
+        }
+        
+        function gameLoop() {
+            if (!gameStarted) return;
+            
+            updatePlayer();
+            updateSCP939();
+            draw();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Initial draw
+        draw();
+    </script>
+</body>
+</html>
