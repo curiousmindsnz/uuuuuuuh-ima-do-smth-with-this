@@ -179,6 +179,7 @@
             <div>FLASHLIGHT: <span id="flashlight">ON</span> (F key)</div>
             <div>AMMO: <span id="ammo">12</span> / <span id="totalAmmo">24</span> (R to reload)</div>
             <div>SILENCER: <span id="silencer" style="color: #f00;">NO</span></div>
+            <div>CROUCH: <span id="crouch" style="color: #f00;">NO</span> (C key)</div>
             <div>SPRINT: <span id="sprint">SHIFT</span></div>
             <div style="margin-top: 10px; color: #ff0;">⚠ SCP-939 hunts by sound!</div>
             <div style="color: #ff0;">💡 Shoot lights to distract SCP-939!</div>
@@ -243,14 +244,18 @@
             velocity: new THREE.Vector3(),
             speed: 0.15,
             sprintSpeed: 0.3,
+            crouchSpeed: 0.08,
             noiseLevel: 0,
             flashlightOn: true,
             height: 1.8,
+            normalHeight: 1.8,
+            crouchHeight: 1.2,
             radius: 0.5,
             ammo: 12,
             totalAmmo: 24,
             reloading: false,
-            hasSilencer: false
+            hasSilencer: false,
+            crouching: false
         };
         
         // SCP-939 states (multiple instances)
@@ -821,6 +826,14 @@
             if (e.key.toLowerCase() === 'r' && gameStarted && !playerState.reloading) {
                 reload();
             }
+            if (e.key.toLowerCase() === 'c' && gameStarted) {
+                playerState.crouching = !playerState.crouching;
+                playerState.height = playerState.crouching ? playerState.crouchHeight : playerState.normalHeight;
+                // Adjust camera height
+                const heightDiff = playerState.crouching ? -0.6 : 0.6;
+                camera.position.y += heightDiff;
+                playerState.position.y += heightDiff;
+            }
         }
         
         function onKeyUp(e) {
@@ -859,6 +872,8 @@
             playerState.ammo = 12;
             playerState.totalAmmo = 24;
             playerState.reloading = false;
+            playerState.crouching = false;
+            playerState.height = playerState.normalHeight;
             
             // Randomize all SCP-939 spawns on restart
             scpStates.forEach((scpState, index) => {
@@ -885,8 +900,9 @@
         
         function updatePlayer(delta) {
             let moving = false;
-            let sprinting = keys['shift'];
-            let speed = sprinting ? playerState.sprintSpeed : playerState.speed;
+            let sprinting = keys['shift'] && !playerState.crouching; // Can't sprint while crouching
+            let speed = playerState.crouching ? playerState.crouchSpeed : 
+                       (sprinting ? playerState.sprintSpeed : playerState.speed);
             
             const direction = new THREE.Vector3();
             
@@ -925,7 +941,8 @@
             // Normalize direction if moving
             if (moving && direction.length() > 0) {
                 direction.normalize();
-                playerState.noiseLevel = sprinting ? 100 : 40;
+                // Crouching makes much less noise, sprinting makes most noise
+                playerState.noiseLevel = playerState.crouching ? 10 : (sprinting ? 100 : 40);
                 
                 const newPosition = playerState.position.clone();
                 newPosition.add(direction.multiplyScalar(speed));
@@ -1111,6 +1128,8 @@
             document.getElementById('totalAmmo').textContent = playerState.totalAmmo;
             document.getElementById('silencer').textContent = playerState.hasSilencer ? 'YES' : 'NO';
             document.getElementById('silencer').style.color = playerState.hasSilencer ? '#0f0' : '#f00';
+            document.getElementById('crouch').textContent = playerState.crouching ? 'YES' : 'NO';
+            document.getElementById('crouch').style.color = playerState.crouching ? '#0f0' : '#f00';
             
             if (playerState.reloading) {
                 document.getElementById('ammo').textContent = 'RELOADING...';
