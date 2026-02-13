@@ -178,6 +178,7 @@
             <div>NOISE LEVEL: <span id="noiseLevel">0%</span></div>
             <div>FLASHLIGHT: <span id="flashlight">ON</span> (F key)</div>
             <div>AMMO: <span id="ammo">12</span> / <span id="totalAmmo">24</span> (R to reload)</div>
+            <div>SILENCER: <span id="silencer" style="color: #f00;">NO</span></div>
             <div>SPRINT: <span id="sprint">SHIFT</span></div>
             <div style="margin-top: 10px; color: #ff0;">⚠ SCP-939 hunts by sound!</div>
             <div style="color: #ff0;">💡 Shoot lights to distract SCP-939!</div>
@@ -228,6 +229,7 @@
         let exitDoor;
         let lights = [];
         let muzzleFlash;
+        let silencer;
         
         // Game state
         let gameStarted = false;
@@ -247,7 +249,8 @@
             radius: 0.5,
             ammo: 12,
             totalAmmo: 24,
-            reloading: false
+            reloading: false,
+            hasSilencer: false
         };
         
         // SCP-939 states (multiple instances)
@@ -358,6 +361,7 @@
             createSCP939s();
             createExit();
             createMuzzleFlash();
+            createSilencer();
             
             // Event listeners
             window.addEventListener('resize', onWindowResize);
@@ -647,6 +651,47 @@
             scene.add(muzzleFlash);
         }
         
+        function createSilencer() {
+            // Create silencer pickup object in the maze
+            const silencerGroup = new THREE.Group();
+            
+            // Main cylinder body
+            const bodyGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.6, 16);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x333333,
+                metalness: 0.8,
+                roughness: 0.2
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.rotation.z = Math.PI / 2;
+            silencerGroup.add(body);
+            
+            // Add a glow effect
+            const glowGeometry = new THREE.TorusGeometry(0.2, 0.05, 8, 16);
+            const glowMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x00ff00,
+                transparent: true,
+                opacity: 0.6
+            });
+            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+            glow.rotation.y = Math.PI / 2;
+            silencerGroup.add(glow);
+            
+            // Position in the maze (somewhere accessible but not at spawn)
+            silencerGroup.position.set(15, 1, 10);
+            
+            // Make it slowly rotate for visibility
+            silencerGroup.userData.rotationSpeed = 0.02;
+            
+            silencer = silencerGroup;
+            scene.add(silencer);
+            
+            // Add point light to make it easier to find
+            const pickupLight = new THREE.PointLight(0x00ff00, 0.5, 8);
+            pickupLight.position.copy(silencerGroup.position);
+            scene.add(pickupLight);
+        }
+        
         function shoot() {
             if (playerState.ammo <= 0 || playerState.reloading) {
                 // Click sound for empty gun
@@ -654,7 +699,8 @@
             }
             
             playerState.ammo--;
-            playerState.noiseLevel = 100; // Shooting is VERY loud
+            // Silencer makes gun silent, otherwise it's very loud
+            playerState.noiseLevel = playerState.hasSilencer ? 5 : 100;
             
             // Muzzle flash effect
             const lookDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -752,6 +798,11 @@
                 lightObj.light.intensity = lightObj.baseIntensity + flicker;
                 lightObj.bulb.material.emissiveIntensity = 1 + flicker;
             });
+            
+            // Rotate silencer if it exists
+            if (silencer) {
+                silencer.rotation.y += silencer.userData.rotationSpeed;
+            }
         }
         
         function onWindowResize() {
@@ -905,6 +956,16 @@
                 document.getElementById('victory').classList.remove('hidden');
             }
             
+            // Check silencer pickup
+            if (silencer && !playerState.hasSilencer) {
+                const distToSilencer = playerState.position.distanceTo(silencer.position);
+                if (distToSilencer < 2) {
+                    playerState.hasSilencer = true;
+                    scene.remove(silencer);
+                    silencer = null;
+                }
+            }
+            
             // Check SCP-939 collision with all instances
             for (let i = 0; i < scpStates.length; i++) {
                 const distToSCP = playerState.position.distanceTo(scpStates[i].position);
@@ -1048,6 +1109,8 @@
             document.getElementById('flashlight').style.color = playerState.flashlightOn ? '#0f0' : '#f00';
             document.getElementById('ammo').textContent = playerState.ammo;
             document.getElementById('totalAmmo').textContent = playerState.totalAmmo;
+            document.getElementById('silencer').textContent = playerState.hasSilencer ? 'YES' : 'NO';
+            document.getElementById('silencer').style.color = playerState.hasSilencer ? '#0f0' : '#f00';
             
             if (playerState.reloading) {
                 document.getElementById('ammo').textContent = 'RELOADING...';
