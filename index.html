@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SCP-939 Escape - 3D</title>
+    <title>SCP-939 transport implication</title>
     <style>
         * {
             margin: 0;
@@ -202,18 +202,19 @@
             • Breaking lights attracts SCP-939 to that location<br>
             • Find the EXIT (green glowing door)<br>
             • Stay in first-person view for immersion</p>
+            <p style="margin-top: 20px; font-size: 12px; color: #888;">Game inspired by SCP-939 by Adam Smascher and EchoFourDelta</p>
             <button onclick="startGame()">START MISSION</button>
         </div>
         
         <div id="gameOver" class="hidden">
-            <h2>YOU WERE CONSUMED</h2>
-            <p>SCP-939 heard you...</p>
+            <h2>You were consumed...</h2>
+            <p>Dr [REDACTED] found dead due to multiple lacerations and bate marks corpse had to be identified unsing DNA testing</p>
             <button onclick="restartGame()">TRY AGAIN</button>
         </div>
         
         <div id="victory" class="hidden">
-            <h2>CONTAINMENT SUCCESSFUL</h2>
-            <p>You escaped the maintenance tunnels!</p>
+            <h2>YOU ESCAPED</h2>
+            <p>You escaped the maintenance tunnels and MTF were able to recontain SCP-939!</p>
             <button onclick="restartGame()">PLAY AGAIN</button>
         </div>
     </div>
@@ -222,7 +223,7 @@
     <script>
         // Three.js setup
         let scene, camera, renderer;
-        let player, scp939Mesh, flashlight;
+        let player, scp939Meshes = [], flashlight;
         let walls = [];
         let exitDoor;
         let lights = [];
@@ -236,10 +237,10 @@
         
         // Player state
         const playerState = {
-            position: new THREE.Vector3(5, 1, 5),
+            position: new THREE.Vector3(-25, 1.8, -25),
             velocity: new THREE.Vector3(),
-            speed: 0.1,
-            sprintSpeed: 0.2,
+            speed: 0.15,
+            sprintSpeed: 0.3,
             noiseLevel: 0,
             flashlightOn: true,
             height: 1.8,
@@ -249,17 +250,39 @@
             reloading: false
         };
         
-        // SCP-939 state
-        const scpState = {
-            position: new THREE.Vector3(0, 0.5, 0), // Will be randomized
-            velocity: new THREE.Vector3(),
-            speed: 0.08,
-            targetPosition: new THREE.Vector3(0, 0.5, 0),
-            hearingRange: 15,
-            lightRepelDistance: 8,
-            patrolTimer: 0,
-            investigating: false
-        };
+        // SCP-939 states (multiple instances)
+        const scpStates = [
+            {
+                position: new THREE.Vector3(0, 0.5, 0),
+                velocity: new THREE.Vector3(),
+                speed: 0.08,
+                targetPosition: new THREE.Vector3(0, 0.5, 0),
+                hearingRange: 15,
+                lightRepelDistance: 8,
+                patrolTimer: 0,
+                investigating: false
+            },
+            {
+                position: new THREE.Vector3(0, 0.5, 0),
+                velocity: new THREE.Vector3(),
+                speed: 0.08,
+                targetPosition: new THREE.Vector3(0, 0.5, 0),
+                hearingRange: 15,
+                lightRepelDistance: 8,
+                patrolTimer: 50,
+                investigating: false
+            },
+            {
+                position: new THREE.Vector3(0, 0.5, 0),
+                velocity: new THREE.Vector3(),
+                speed: 0.08,
+                targetPosition: new THREE.Vector3(0, 0.5, 0),
+                hearingRange: 15,
+                lightRepelDistance: 8,
+                patrolTimer: 100,
+                investigating: false
+            }
+        ];
         
         // Function to get random spawn position for SCP-939
         function getRandomSCPSpawn() {
@@ -267,11 +290,11 @@
             let x, z;
             
             while (!validPosition) {
-                // Random position in the maze
-                x = (Math.random() - 0.5) * 40;
-                z = (Math.random() - 0.5) * 40;
+                // Random position in the larger maze
+                x = (Math.random() - 0.5) * 70;
+                z = (Math.random() - 0.5) * 70;
                 
-                // Check distance from player (must be at least 15 units away)
+                // Check distance from player (must be at least 20 units away)
                 const distFromPlayer = Math.sqrt(
                     Math.pow(x - playerState.position.x, 2) + 
                     Math.pow(z - playerState.position.z, 2)
@@ -279,11 +302,11 @@
                 
                 // Check distance from exit (don't spawn too close to exit)
                 const distFromExit = Math.sqrt(
-                    Math.pow(x - 23, 2) + 
-                    Math.pow(z - (-24), 2)
+                    Math.pow(x - 38, 2) + 
+                    Math.pow(z - (-38), 2)
                 );
                 
-                if (distFromPlayer > 15 && distFromExit > 10) {
+                if (distFromPlayer > 20 && distFromExit > 15) {
                     // Check if position is not inside a wall
                     const testPos = new THREE.Vector3(x, 0.5, z);
                     if (!checkSCPWallCollision(testPos)) {
@@ -316,12 +339,12 @@
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             document.getElementById('gameContainer').appendChild(renderer.domElement);
             
-            // Ambient light (very dim)
-            const ambientLight = new THREE.AmbientLight(0x111111);
+            // Ambient light (darker atmosphere)
+            const ambientLight = new THREE.AmbientLight(0x222222, 0.3);
             scene.add(ambientLight);
             
             // Flashlight (spotlight)
-            flashlight = new THREE.SpotLight(0xffffaa, 1.5, 20, Math.PI / 6, 0.5, 2);
+            flashlight = new THREE.SpotLight(0xffffdd, 2.0, 25, Math.PI / 5, 0.3, 1.5);
             flashlight.position.copy(camera.position);
             flashlight.target.position.set(0, 0, -1);
             flashlight.castShadow = true;
@@ -332,7 +355,7 @@
             
             createMaze();
             createLights();
-            createSCP939();
+            createSCP939s();
             createExit();
             createMuzzleFlash();
             
@@ -359,59 +382,146 @@
             const wallThickness = 0.5;
             
             const wallMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x333333,
+                color: 0x444444,
                 roughness: 0.8,
                 metalness: 0.2
             });
             
-            // Floor
-            const floorGeometry = new THREE.PlaneGeometry(50, 50);
+            // Floor (larger)
+            const floorGeometry = new THREE.PlaneGeometry(80, 80);
             const floorMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x222222,
+                color: 0x1a1a1a,
                 roughness: 1
             });
             const floor = new THREE.Mesh(floorGeometry, floorMaterial);
             floor.rotation.x = -Math.PI / 2;
+            floor.position.y = 0;
             floor.receiveShadow = true;
             scene.add(floor);
             
-            // Ceiling
-            const ceiling = new THREE.Mesh(floorGeometry, floorMaterial);
+            // Ceiling (larger)
+            const ceilingMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x0a0a0a,
+                roughness: 1
+            });
+            const ceiling = new THREE.Mesh(floorGeometry, ceilingMaterial);
             ceiling.rotation.x = Math.PI / 2;
             ceiling.position.y = wallHeight;
             scene.add(ceiling);
             
-            // Maze walls (3D version of the 2D maze)
+            // Clear walls array
+            walls = [];
+            
+            // Corridor system with guaranteed openings at intersections
+            const corridorWidth = 6;
             const wallConfigs = [
                 // Outer walls
-                { x: 0, z: 0, width: 50, depth: wallThickness },
-                { x: 0, z: 0, width: wallThickness, depth: 50 },
-                { x: 50 - wallThickness, z: 0, width: wallThickness, depth: 50 },
-                { x: 0, z: 50 - wallThickness, width: 50, depth: wallThickness },
+                { x: 0, z: 0, width: 80, depth: wallThickness },
+                { x: 0, z: 0, width: wallThickness, depth: 80 },
+                { x: 80 - wallThickness, z: 0, width: wallThickness, depth: 80 },
+                { x: 0, z: 80 - wallThickness, width: 80, depth: wallThickness },
                 
-                // Internal maze walls
-                { x: 8, z: 8, width: wallThickness, depth: 12 },
-                { x: 12, z: 12, width: wallThickness, depth: 15 },
-                { x: 18, z: 8, width: wallThickness, depth: 12 },
-                { x: 24, z: 12, width: wallThickness, depth: 18 },
-                { x: 30, z: 4, width: wallThickness, depth: 15 },
-                { x: 36, z: 12, width: wallThickness, depth: 18 },
+                // Vertical corridor walls (left to right, with gaps for horizontal corridors)
+                // Corridor 1 walls
+                { x: 10, z: 0, width: wallThickness, depth: 10 },
+                { x: 10, z: 20, width: wallThickness, depth: 8 },
+                { x: 10, z: 38, width: wallThickness, depth: 8 },
+                { x: 10, z: 56, width: wallThickness, depth: 8 },
+                { x: 10, z: 70, width: wallThickness, depth: 10 },
                 
-                { x: 8, z: 8, width: 12, depth: wallThickness },
-                { x: 18, z: 12, width: 12, depth: wallThickness },
-                { x: 8, z: 18, width: 8, depth: wallThickness },
-                { x: 18, z: 24, width: 12, depth: wallThickness },
-                { x: 30, z: 18, width: 12, depth: wallThickness },
-                { x: 24, z: 30, width: 12, depth: wallThickness },
+                { x: 16, z: 0, width: wallThickness, depth: 10 },
+                { x: 16, z: 20, width: wallThickness, depth: 8 },
+                { x: 16, z: 38, width: wallThickness, depth: 8 },
+                { x: 16, z: 56, width: wallThickness, depth: 8 },
+                { x: 16, z: 70, width: wallThickness, depth: 10 },
+                
+                // Corridor 2 walls
+                { x: 25, z: 0, width: wallThickness, depth: 10 },
+                { x: 25, z: 20, width: wallThickness, depth: 8 },
+                { x: 25, z: 38, width: wallThickness, depth: 8 },
+                { x: 25, z: 56, width: wallThickness, depth: 8 },
+                { x: 25, z: 70, width: wallThickness, depth: 10 },
+                
+                { x: 31, z: 0, width: wallThickness, depth: 10 },
+                { x: 31, z: 20, width: wallThickness, depth: 8 },
+                { x: 31, z: 38, width: wallThickness, depth: 8 },
+                { x: 31, z: 56, width: wallThickness, depth: 8 },
+                { x: 31, z: 70, width: wallThickness, depth: 10 },
+                
+                // Corridor 3 walls
+                { x: 40, z: 0, width: wallThickness, depth: 10 },
+                { x: 40, z: 20, width: wallThickness, depth: 8 },
+                { x: 40, z: 38, width: wallThickness, depth: 8 },
+                { x: 40, z: 56, width: wallThickness, depth: 8 },
+                { x: 40, z: 70, width: wallThickness, depth: 10 },
+                
+                { x: 46, z: 0, width: wallThickness, depth: 10 },
+                { x: 46, z: 20, width: wallThickness, depth: 8 },
+                { x: 46, z: 38, width: wallThickness, depth: 8 },
+                { x: 46, z: 56, width: wallThickness, depth: 8 },
+                { x: 46, z: 70, width: wallThickness, depth: 10 },
+                
+                // Corridor 4 walls
+                { x: 55, z: 0, width: wallThickness, depth: 10 },
+                { x: 55, z: 20, width: wallThickness, depth: 8 },
+                { x: 55, z: 38, width: wallThickness, depth: 8 },
+                { x: 55, z: 56, width: wallThickness, depth: 8 },
+                { x: 55, z: 70, width: wallThickness, depth: 10 },
+                
+                { x: 61, z: 0, width: wallThickness, depth: 10 },
+                { x: 61, z: 20, width: wallThickness, depth: 8 },
+                { x: 61, z: 38, width: wallThickness, depth: 8 },
+                { x: 61, z: 56, width: wallThickness, depth: 8 },
+                { x: 61, z: 70, width: wallThickness, depth: 10 },
+                
+                // Horizontal corridor walls (with gaps for vertical corridors)
+                // Corridor A walls (top)
+                { x: 0, z: 13, width: 8, depth: wallThickness },
+                { x: 18, z: 13, width: 5, depth: wallThickness },
+                { x: 33, z: 13, width: 5, depth: wallThickness },
+                { x: 48, z: 13, width: 5, depth: wallThickness },
+                { x: 63, z: 13, width: 17, depth: wallThickness },
+                
+                { x: 0, z: 19, width: 8, depth: wallThickness },
+                { x: 18, z: 19, width: 5, depth: wallThickness },
+                { x: 33, z: 19, width: 5, depth: wallThickness },
+                { x: 48, z: 19, width: 5, depth: wallThickness },
+                { x: 63, z: 19, width: 17, depth: wallThickness },
+                
+                // Corridor B walls (upper-middle)
+                { x: 0, z: 31, width: 8, depth: wallThickness },
+                { x: 18, z: 31, width: 5, depth: wallThickness },
+                { x: 33, z: 31, width: 5, depth: wallThickness },
+                { x: 48, z: 31, width: 5, depth: wallThickness },
+                { x: 63, z: 31, width: 17, depth: wallThickness },
+                
+                { x: 0, z: 37, width: 8, depth: wallThickness },
+                { x: 18, z: 37, width: 5, depth: wallThickness },
+                { x: 33, z: 37, width: 5, depth: wallThickness },
+                { x: 48, z: 37, width: 5, depth: wallThickness },
+                { x: 63, z: 37, width: 17, depth: wallThickness },
+                
+                // Corridor C walls (middle)
+                { x: 0, z: 49, width: 8, depth: wallThickness },
+                { x: 18, z: 49, width: 5, depth: wallThickness },
+                { x: 33, z: 49, width: 5, depth: wallThickness },
+                { x: 48, z: 49, width: 5, depth: wallThickness },
+                { x: 63, z: 49, width: 17, depth: wallThickness },
+                
+                { x: 0, z: 55, width: 8, depth: wallThickness },
+                { x: 18, z: 55, width: 5, depth: wallThickness },
+                { x: 33, z: 55, width: 5, depth: wallThickness },
+                { x: 48, z: 55, width: 5, depth: wallThickness },
+                { x: 63, z: 55, width: 17, depth: wallThickness },
             ];
             
             wallConfigs.forEach(config => {
                 const geometry = new THREE.BoxGeometry(config.width, wallHeight, config.depth);
                 const wall = new THREE.Mesh(geometry, wallMaterial);
                 wall.position.set(
-                    config.x + config.width / 2 - 25,
+                    config.x + config.width / 2 - 40,
                     wallHeight / 2,
-                    config.z + config.depth / 2 - 25
+                    config.z + config.depth / 2 - 40
                 );
                 wall.castShadow = true;
                 wall.receiveShadow = true;
@@ -423,41 +533,45 @@
             });
         }
         
-        function createSCP939() {
-            // Randomize spawn position
-            const spawnPos = getRandomSCPSpawn();
-            scpState.position.copy(spawnPos);
-            scpState.targetPosition.copy(spawnPos);
-            
-            // SCP-939 body (creature-like shape)
-            const bodyGeometry = new THREE.SphereGeometry(0.8, 16, 16);
-            bodyGeometry.scale(1, 0.7, 1.3);
-            const bodyMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x440000,
-                roughness: 0.9,
-                emissive: 0x220000
+        function createSCP939s() {
+            // Create multiple SCP-939 instances
+            scpStates.forEach((scpState, index) => {
+                // Randomize spawn position
+                const spawnPos = getRandomSCPSpawn();
+                scpState.position.copy(spawnPos);
+                scpState.targetPosition.copy(spawnPos);
+                
+                // SCP-939 body (creature-like shape)
+                const bodyGeometry = new THREE.SphereGeometry(0.8, 16, 16);
+                bodyGeometry.scale(1, 0.7, 1.3);
+                const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x440000,
+                    roughness: 0.9,
+                    emissive: 0x220000
+                });
+                const scp939Mesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                scp939Mesh.position.copy(scpState.position);
+                scp939Mesh.castShadow = true;
+                
+                // Add eyes (white glowing)
+                const eyeGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+                const eyeMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xffffff,
+                    emissive: 0xffffff,
+                    emissiveIntensity: 0.5
+                });
+                
+                const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+                leftEye.position.set(-0.3, 0.2, 0.6);
+                scp939Mesh.add(leftEye);
+                
+                const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+                rightEye.position.set(0.3, 0.2, 0.6);
+                scp939Mesh.add(rightEye);
+                
+                scene.add(scp939Mesh);
+                scp939Meshes.push(scp939Mesh);
             });
-            scp939Mesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
-            scp939Mesh.position.copy(scpState.position);
-            scp939Mesh.castShadow = true;
-            
-            // Add eyes (white glowing)
-            const eyeGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-            const eyeMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0xffffff,
-                emissive: 0xffffff,
-                emissiveIntensity: 0.5
-            });
-            
-            const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-            leftEye.position.set(-0.3, 0.2, 0.6);
-            scp939Mesh.add(leftEye);
-            
-            const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-            rightEye.position.set(0.3, 0.2, 0.6);
-            scp939Mesh.add(rightEye);
-            
-            scene.add(scp939Mesh);
         }
         
         function createExit() {
@@ -469,7 +583,7 @@
                 emissiveIntensity: 0.5
             });
             exitDoor = new THREE.Mesh(doorGeometry, doorMaterial);
-            exitDoor.position.set(23, 1.5, -24);
+            exitDoor.position.set(38, 1.5, -38);
             scene.add(exitDoor);
             
             // Add point light at exit
@@ -479,24 +593,17 @@
         }
         
         function createLights() {
-            // Create flickering ceiling lights throughout the maze
+            // Create fewer flickering ceiling lights for darker atmosphere
             const lightPositions = [
-                { x: -15, z: -15 },
-                { x: -5, z: -15 },
-                { x: 5, z: -15 },
-                { x: 15, z: -15 },
-                { x: -15, z: -5 },
-                { x: -5, z: -5 },
-                { x: 5, z: -5 },
-                { x: 15, z: -5 },
-                { x: -15, z: 5 },
-                { x: -5, z: 5 },
-                { x: 5, z: 5 },
-                { x: 15, z: 5 },
-                { x: -15, z: 15 },
-                { x: -5, z: 15 },
-                { x: 5, z: 15 },
-                { x: 15, z: 15 }
+                { x: -25, z: -25 },
+                { x: 0, z: -30 },
+                { x: 25, z: -20 },
+                { x: -30, z: 0 },
+                { x: 0, z: 0 },
+                { x: 30, z: 5 },
+                { x: -20, z: 25 },
+                { x: 10, z: 30 },
+                { x: 35, z: -35 }
             ];
             
             lightPositions.forEach((pos, index) => {
@@ -514,7 +621,7 @@
                 // Point light
                 const pointLight = new THREE.PointLight(0xffffaa, 0.8, 12);
                 pointLight.position.copy(bulb.position);
-                pointLight.castShadow = true;
+                pointLight.castShadow = false; // Disable shadows for performance
                 scene.add(pointLight);
                 
                 lights.push({
@@ -612,10 +719,12 @@
                 animateShard();
             }
             
-            // Attract SCP-939 to the broken light location
-            scpState.targetPosition.copy(lightObj.position);
-            scpState.targetPosition.y = 0.5;
-            scpState.investigating = true;
+            // Attract all SCP-939s to the broken light location
+            scpStates.forEach(scpState => {
+                scpState.targetPosition.copy(lightObj.position);
+                scpState.targetPosition.y = 0.5;
+                scpState.investigating = true;
+            });
         }
         
         function reload() {
@@ -653,6 +762,7 @@
         
         function onKeyDown(e) {
             keys[e.key.toLowerCase()] = true;
+            
             if (e.key.toLowerCase() === 'f' && gameStarted) {
                 playerState.flashlightOn = !playerState.flashlightOn;
                 flashlight.visible = playerState.flashlightOn;
@@ -672,22 +782,26 @@
             const movementX = e.movementX || 0;
             const movementY = e.movementY || 0;
             
+            // Horizontal rotation (Y axis)
             camera.rotation.y -= movementX * 0.002;
-            camera.rotation.x -= movementY * 0.002;
             
-            // Limit vertical rotation
+            // Vertical rotation (X axis) - looking up/down
+            camera.rotation.x += movementY * 0.002;
+            
+            // Limit vertical rotation so you can't flip upside down
             camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
         }
         
         function startGame() {
             document.getElementById('instructions').classList.add('hidden');
             gameStarted = true;
+            pointerLocked = false;
             renderer.domElement.requestPointerLock();
             animate();
         }
         
         function restartGame() {
-            playerState.position.set(5, 1, 5);
+            playerState.position.set(-25, 1.8, -25);
             playerState.velocity.set(0, 0, 0);
             playerState.noiseLevel = 0;
             playerState.flashlightOn = true;
@@ -695,11 +809,13 @@
             playerState.totalAmmo = 24;
             playerState.reloading = false;
             
-            // Randomize SCP-939 spawn on restart
-            const newSpawn = getRandomSCPSpawn();
-            scpState.position.copy(newSpawn);
-            scpState.targetPosition.copy(newSpawn);
-            scpState.investigating = false;
+            // Randomize all SCP-939 spawns on restart
+            scpStates.forEach((scpState, index) => {
+                const newSpawn = getRandomSCPSpawn();
+                scpState.position.copy(newSpawn);
+                scpState.targetPosition.copy(newSpawn);
+                scpState.investigating = false;
+            });
             
             camera.position.copy(playerState.position);
             camera.rotation.set(0, 0, 0);
@@ -722,14 +838,22 @@
             let speed = sprinting ? playerState.sprintSpeed : playerState.speed;
             
             const direction = new THREE.Vector3();
-            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
             
-            forward.y = 0;
-            forward.normalize();
-            right.y = 0;
-            right.normalize();
+            // Calculate forward direction based on camera Y rotation only
+            const forward = new THREE.Vector3(
+                -Math.sin(camera.rotation.y),
+                0,
+                -Math.cos(camera.rotation.y)
+            );
             
+            // Calculate right vector (perpendicular to forward)
+            const right = new THREE.Vector3(
+                -Math.cos(camera.rotation.y),
+                0,
+                Math.sin(camera.rotation.y)
+            );
+            
+            // Check key inputs and build direction vector
             if (keys['w']) {
                 direction.add(forward);
                 moving = true;
@@ -739,17 +863,17 @@
                 moving = true;
             }
             if (keys['a']) {
-                direction.sub(right);
-                moving = true;
-            }
-            if (keys['d']) {
                 direction.add(right);
                 moving = true;
             }
+            if (keys['d']) {
+                direction.sub(right);
+                moving = true;
+            }
             
-            direction.normalize();
-            
-            if (moving) {
+            // Normalize direction if moving
+            if (moving && direction.length() > 0) {
+                direction.normalize();
                 playerState.noiseLevel = sprinting ? 100 : 40;
                 
                 const newPosition = playerState.position.clone();
@@ -763,13 +887,14 @@
                 playerState.noiseLevel = Math.max(0, playerState.noiseLevel - 2);
             }
             
-            // Update camera position
+            // Update camera position to follow player
             camera.position.copy(playerState.position);
             
-            // Update flashlight
+            // Update flashlight position and direction
             flashlight.position.copy(camera.position);
             const lookDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-            flashlight.target.position.copy(camera.position).add(lookDirection);
+            flashlight.target.position.copy(camera.position).add(lookDirection.multiplyScalar(5));
+            flashlight.target.updateMatrixWorld();
             
             // Check exit collision
             const distToExit = playerState.position.distanceTo(exitDoor.position);
@@ -780,13 +905,16 @@
                 document.getElementById('victory').classList.remove('hidden');
             }
             
-            // Check SCP-939 collision
-            const distToSCP = playerState.position.distanceTo(scpState.position);
-            if (distToSCP < 1.5) {
-                gameOver = true;
-                gameStarted = false;
-                document.exitPointerLock();
-                document.getElementById('gameOver').classList.remove('hidden');
+            // Check SCP-939 collision with all instances
+            for (let i = 0; i < scpStates.length; i++) {
+                const distToSCP = playerState.position.distanceTo(scpStates[i].position);
+                if (distToSCP < 1.5) {
+                    gameOver = true;
+                    gameStarted = false;
+                    document.exitPointerLock();
+                    document.getElementById('gameOver').classList.remove('hidden');
+                    break;
+                }
             }
         }
         
@@ -812,88 +940,92 @@
             return false;
         }
         
-        function updateSCP939(delta) {
-            const distToPlayer = scpState.position.distanceTo(playerState.position);
-            
-            // Check if flashlight is pointed at SCP-939
-            let repelledByLight = false;
-            if (playerState.flashlightOn) {
-                const directionToSCP = new THREE.Vector3()
-                    .subVectors(scpState.position, playerState.position)
-                    .normalize();
-                const cameraDirection = new THREE.Vector3(0, 0, -1)
-                    .applyQuaternion(camera.quaternion)
-                    .normalize();
+        function updateSCP939s(delta) {
+            // Update all SCP-939 instances
+            scpStates.forEach((scpState, index) => {
+                const scp939Mesh = scp939Meshes[index];
+                const distToPlayer = scpState.position.distanceTo(playerState.position);
                 
-                const angle = directionToSCP.dot(cameraDirection);
-                
-                if (angle > 0.7 && distToPlayer < 10) {
-                    // Flashlight is pointing at SCP-939, repel it
-                    const repelDirection = new THREE.Vector3()
+                // Check if flashlight is pointed at this SCP-939
+                let repelledByLight = false;
+                if (playerState.flashlightOn) {
+                    const directionToSCP = new THREE.Vector3()
                         .subVectors(scpState.position, playerState.position)
                         .normalize();
-                    scpState.targetPosition.copy(scpState.position)
-                        .add(repelDirection.multiplyScalar(5));
-                    repelledByLight = true;
+                    const cameraDirection = new THREE.Vector3(0, 0, -1)
+                        .applyQuaternion(camera.quaternion)
+                        .normalize();
                     
-                    // Make SCP-939 glow red when in light
-                    scp939Mesh.material.emissive.setHex(0xff0000);
-                    scp939Mesh.material.emissiveIntensity = 0.8;
-                }
-            }
-            
-            if (!repelledByLight) {
-                scp939Mesh.material.emissive.setHex(0x220000);
-                scp939Mesh.material.emissiveIntensity = 0.2;
-                
-                // Hunt by sound
-                if (playerState.noiseLevel > 0 && distToPlayer < scpState.hearingRange) {
-                    scpState.targetPosition.copy(playerState.position);
-                    scpState.investigating = true;
-                } else if (!scpState.investigating) {
-                    // Random patrol
-                    scpState.patrolTimer++;
-                    if (scpState.patrolTimer > 180) {
-                        scpState.targetPosition.set(
-                            (Math.random() - 0.5) * 40,
-                            0.5,
-                            (Math.random() - 0.5) * 40
-                        );
-                        scpState.patrolTimer = 0;
+                    const angle = directionToSCP.dot(cameraDirection);
+                    
+                    if (angle > 0.7 && distToPlayer < 10) {
+                        // Flashlight is pointing at SCP-939, repel it
+                        const repelDirection = new THREE.Vector3()
+                            .subVectors(scpState.position, playerState.position)
+                            .normalize();
+                        scpState.targetPosition.copy(scpState.position)
+                            .add(repelDirection.multiplyScalar(5));
+                        repelledByLight = true;
+                        
+                        // Make SCP-939 glow red when in light
+                        scp939Mesh.material.emissive.setHex(0xff0000);
+                        scp939Mesh.material.emissiveIntensity = 0.8;
                     }
                 }
-            }
-            
-            // Move towards target
-            const distToTarget = scpState.position.distanceTo(scpState.targetPosition);
-            if (distToTarget > 1) {
-                const direction = new THREE.Vector3()
-                    .subVectors(scpState.targetPosition, scpState.position)
-                    .normalize();
                 
-                const newPosition = scpState.position.clone()
-                    .add(direction.multiplyScalar(scpState.speed));
-                
-                // Simple wall avoidance
-                if (!checkSCPWallCollision(newPosition)) {
-                    scpState.position.copy(newPosition);
-                } else {
-                    // Choose new random target if hit wall
-                    scpState.targetPosition.set(
-                        (Math.random() - 0.5) * 40,
-                        0.5,
-                        (Math.random() - 0.5) * 40
-                    );
+                if (!repelledByLight) {
+                    scp939Mesh.material.emissive.setHex(0x220000);
+                    scp939Mesh.material.emissiveIntensity = 0.2;
+                    
+                    // Hunt by sound
+                    if (playerState.noiseLevel > 0 && distToPlayer < scpState.hearingRange) {
+                        scpState.targetPosition.copy(playerState.position);
+                        scpState.investigating = true;
+                    } else if (!scpState.investigating) {
+                        // Random patrol
+                        scpState.patrolTimer++;
+                        if (scpState.patrolTimer > 180) {
+                            scpState.targetPosition.set(
+                                (Math.random() - 0.5) * 70,
+                                0.5,
+                                (Math.random() - 0.5) * 70
+                            );
+                            scpState.patrolTimer = 0;
+                        }
+                    }
                 }
-            } else {
-                scpState.investigating = false;
-            }
-            
-            // Update mesh position and rotation
-            scp939Mesh.position.copy(scpState.position);
-            
-            // Make SCP-939 look at target
-            scp939Mesh.lookAt(scpState.targetPosition);
+                
+                // Move towards target
+                const distToTarget = scpState.position.distanceTo(scpState.targetPosition);
+                if (distToTarget > 1) {
+                    const direction = new THREE.Vector3()
+                        .subVectors(scpState.targetPosition, scpState.position)
+                        .normalize();
+                    
+                    const newPosition = scpState.position.clone()
+                        .add(direction.multiplyScalar(scpState.speed));
+                    
+                    // Simple wall avoidance
+                    if (!checkSCPWallCollision(newPosition)) {
+                        scpState.position.copy(newPosition);
+                    } else {
+                        // Choose new random target if hit wall
+                        scpState.targetPosition.set(
+                            (Math.random() - 0.5) * 70,
+                            0.5,
+                            (Math.random() - 0.5) * 70
+                        );
+                    }
+                } else {
+                    scpState.investigating = false;
+                }
+                
+                // Update mesh position and rotation
+                scp939Mesh.position.copy(scpState.position);
+                
+                // Make SCP-939 look at target
+                scp939Mesh.lookAt(scpState.targetPosition);
+            });
         }
         
         function checkSCPWallCollision(position) {
@@ -930,7 +1062,7 @@
             lastTime = time;
             
             updatePlayer(delta);
-            updateSCP939(delta);
+            updateSCP939s(delta);
             updateLights();
             updateUI();
             
@@ -940,330 +1072,9 @@
         
         // Initialize when page loads
         initThreeJS();
-    </script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
         
-        // Game state
-        let gameStarted = false;
-        let gameOver = false;
-        let victory = false;
-        
-        // Player
-        const player = {
-            x: 50,
-            y: 50,
-            size: 15,
-            speed: 2,
-            sprintSpeed: 4,
-            flashlightOn: true,
-            flashlightRadius: 150,
-            noiseLevel: 0
-        };
-        
-        // SCP-939
-        const scp939 = {
-            x: 700,
-            y: 500,
-            size: 20,
-            speed: 1.5,
-            targetX: 700,
-            targetY: 500,
-            hearingRange: 300,
-            lightRepelDistance: 120,
-            patrolTimer: 0,
-            investigating: false
-        };
-        
-        // Maze walls
-        const walls = [
-            // Outer walls
-            {x: 0, y: 0, width: 800, height: 20},
-            {x: 0, y: 0, width: 20, height: 600},
-            {x: 780, y: 0, width: 20, height: 600},
-            {x: 0, y: 580, width: 800, height: 20},
-            
-            // Internal maze
-            {x: 100, y: 100, width: 20, height: 200},
-            {x: 200, y: 200, width: 20, height: 300},
-            {x: 300, y: 100, width: 20, height: 200},
-            {x: 400, y: 200, width: 20, height: 300},
-            {x: 500, y: 50, width: 20, height: 250},
-            {x: 600, y: 200, width: 20, height: 300},
-            
-            {x: 100, y: 100, width: 200, height: 20},
-            {x: 300, y: 200, width: 200, height: 20},
-            {x: 100, y: 300, width: 120, height: 20},
-            {x: 300, y: 400, width: 200, height: 20},
-            {x: 500, y: 300, width: 200, height: 20},
-            {x: 400, y: 500, width: 200, height: 20},
-        ];
-        
-        // Exit
-        const exit = {
-            x: 750,
-            y: 50,
-            width: 30,
-            height: 50
-        };
-        
-        // Input
-        const keys = {};
-        
-        // Event listeners
-        document.addEventListener('keydown', (e) => {
-            keys[e.key.toLowerCase()] = true;
-            if (e.key.toLowerCase() === 'f' && gameStarted) {
-                player.flashlightOn = !player.flashlightOn;
-            }
-        });
-        
-        document.addEventListener('keyup', (e) => {
-            keys[e.key.toLowerCase()] = false;
-        });
-        
-        function startGame() {
-            document.getElementById('instructions').classList.add('hidden');
-            gameStarted = true;
-            gameLoop();
-        }
-        
-        function restartGame() {
-            player.x = 50;
-            player.y = 50;
-            player.noiseLevel = 0;
-            player.flashlightOn = true;
-            scp939.x = 700;
-            scp939.y = 500;
-            scp939.targetX = 700;
-            scp939.targetY = 500;
-            scp939.investigating = false;
-            gameOver = false;
-            victory = false;
-            document.getElementById('gameOver').classList.add('hidden');
-            document.getElementById('victory').classList.add('hidden');
-            gameStarted = true;
-            gameLoop();
-        }
-        
-        function checkCollision(rect1, rect2) {
-            return rect1.x < rect2.x + rect2.width &&
-                   rect1.x + rect1.size > rect2.x &&
-                   rect1.y < rect2.y + rect2.height &&
-                   rect1.y + rect1.size > rect2.y;
-        }
-        
-        function checkWallCollision(newX, newY) {
-            for (let wall of walls) {
-                if (newX < wall.x + wall.width &&
-                    newX + player.size > wall.x &&
-                    newY < wall.y + wall.height &&
-                    newY + player.size > wall.y) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        
-        function updatePlayer() {
-            let moving = false;
-            let sprinting = keys['shift'];
-            let speed = sprinting ? player.sprintSpeed : player.speed;
-            
-            let newX = player.x;
-            let newY = player.y;
-            
-            if (keys['w'] || keys['arrowup']) {
-                newY -= speed;
-                moving = true;
-            }
-            if (keys['s'] || keys['arrowdown']) {
-                newY += speed;
-                moving = true;
-            }
-            if (keys['a'] || keys['arrowleft']) {
-                newX -= speed;
-                moving = true;
-            }
-            if (keys['d'] || keys['arrowright']) {
-                newX += speed;
-                moving = true;
-            }
-            
-            // Update noise level
-            if (moving) {
-                player.noiseLevel = sprinting ? 100 : 40;
-            } else {
-                player.noiseLevel = Math.max(0, player.noiseLevel - 2);
-            }
-            
-            // Check wall collision
-            if (!checkWallCollision(newX, newY)) {
-                player.x = newX;
-                player.y = newY;
-            }
-            
-            // Check exit collision
-            if (checkCollision(player, exit)) {
-                victory = true;
-                gameStarted = false;
-                document.getElementById('victory').classList.remove('hidden');
-            }
-            
-            // Check SCP-939 collision
-            const distToSCP = Math.hypot(player.x - scp939.x, player.y - scp939.y);
-            if (distToSCP < player.size + scp939.size) {
-                gameOver = true;
-                gameStarted = false;
-                document.getElementById('gameOver').classList.remove('hidden');
-            }
-        }
-        
-        function updateSCP939() {
-            const distToPlayer = Math.hypot(player.x - scp939.x, player.y - scp939.y);
-            
-            // Check if player's flashlight is pointed at SCP-939
-            let repelledByLight = false;
-            if (player.flashlightOn && distToPlayer < player.flashlightRadius) {
-                const angle = Math.atan2(scp939.y - player.y, scp939.x - player.x);
-                const lightIntensity = 1 - (distToPlayer / player.flashlightRadius);
-                if (distToPlayer < player.lightRepelDistance) {
-                    // Flee from light
-                    scp939.targetX = scp939.x + Math.cos(angle) * 100;
-                    scp939.targetY = scp939.y + Math.sin(angle) * 100;
-                    repelledByLight = true;
-                }
-            }
-            
-            // Hunt by sound if not repelled by light
-            if (!repelledByLight) {
-                if (player.noiseLevel > 0 && distToPlayer < scp939.hearingRange) {
-                    // Hear the player - move towards last known position
-                    scp939.targetX = player.x;
-                    scp939.targetY = player.y;
-                    scp939.investigating = true;
-                } else if (!scp939.investigating) {
-                    // Random patrol
-                    scp939.patrolTimer++;
-                    if (scp939.patrolTimer > 120) {
-                        scp939.targetX = Math.random() * (canvas.width - 100) + 50;
-                        scp939.targetY = Math.random() * (canvas.height - 100) + 50;
-                        scp939.patrolTimer = 0;
-                    }
-                }
-            }
-            
-            // Move towards target
-            const distToTarget = Math.hypot(scp939.targetX - scp939.x, scp939.targetY - scp939.y);
-            if (distToTarget > 5) {
-                const angle = Math.atan2(scp939.targetY - scp939.y, scp939.targetX - scp939.x);
-                const newX = scp939.x + Math.cos(angle) * scp939.speed;
-                const newY = scp939.y + Math.sin(angle) * scp939.speed;
-                
-                // Simple wall avoidance
-                let wallHit = false;
-                for (let wall of walls) {
-                    if (newX < wall.x + wall.width &&
-                        newX + scp939.size > wall.x &&
-                        newY < wall.y + wall.height &&
-                        newY + scp939.size > wall.y) {
-                        wallHit = true;
-                        break;
-                    }
-                }
-                
-                if (!wallHit) {
-                    scp939.x = newX;
-                    scp939.y = newY;
-                } else {
-                    // Try to navigate around wall
-                    scp939.targetX = Math.random() * canvas.width;
-                    scp939.targetY = Math.random() * canvas.height;
-                }
-            } else {
-                scp939.investigating = false;
-            }
-        }
-        
-        function draw() {
-            // Clear canvas
-            ctx.fillStyle = '#111';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw walls
-            ctx.fillStyle = '#333';
-            for (let wall of walls) {
-                ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
-            }
-            
-            // Draw exit
-            ctx.fillStyle = '#0f0';
-            ctx.fillRect(exit.x, exit.y, exit.width, exit.height);
-            ctx.fillStyle = '#0f0';
-            ctx.font = '12px Courier New';
-            ctx.fillText('EXIT', exit.x + 2, exit.y - 5);
-            
-            // Draw flashlight cone
-            if (player.flashlightOn) {
-                const gradient = ctx.createRadialGradient(
-                    player.x + player.size/2, player.y + player.size/2, 10,
-                    player.x + player.size/2, player.y + player.size/2, player.flashlightRadius
-                );
-                gradient.addColorStop(0, 'rgba(255, 255, 200, 0.3)');
-                gradient.addColorStop(0.5, 'rgba(255, 255, 200, 0.1)');
-                gradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
-            
-            // Draw SCP-939
-            const distToPlayer = Math.hypot(player.x - scp939.x, player.y - scp939.y);
-            const inLight = player.flashlightOn && distToPlayer < player.flashlightRadius;
-            
-            ctx.fillStyle = inLight ? '#a00' : '#300';
-            ctx.beginPath();
-            ctx.arc(scp939.x + scp939.size/2, scp939.y + scp939.size/2, scp939.size, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Draw SCP-939 details (teeth/menacing look)
-            if (inLight) {
-                ctx.fillStyle = '#fff';
-                ctx.beginPath();
-                ctx.arc(scp939.x + scp939.size/2 - 5, scp939.y + scp939.size/2, 3, 0, Math.PI * 2);
-                ctx.arc(scp939.x + scp939.size/2 + 5, scp939.y + scp939.size/2, 3, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            
-            // Draw player
-            ctx.fillStyle = '#00f';
-            ctx.fillRect(player.x, player.y, player.size, player.size);
-            
-            // Draw flashlight indicator on player
-            if (player.flashlightOn) {
-                ctx.fillStyle = '#ff0';
-                ctx.beginPath();
-                ctx.arc(player.x + player.size/2, player.y + player.size/2, 4, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            
-            // Update UI
-            document.getElementById('noiseLevel').textContent = Math.round(player.noiseLevel) + '%';
-            document.getElementById('flashlight').textContent = player.flashlightOn ? 'ON' : 'OFF';
-            document.getElementById('flashlight').style.color = player.flashlightOn ? '#0f0' : '#f00';
-        }
-        
-        function gameLoop() {
-            if (!gameStarted) return;
-            
-            updatePlayer();
-            updateSCP939();
-            draw();
-            
-            requestAnimationFrame(gameLoop);
-        }
-        
-        // Initial draw
-        draw();
+        // Render initial frame before game starts so scene is visible
+        renderer.render(scene, camera);
     </script>
 </body>
 </html>
